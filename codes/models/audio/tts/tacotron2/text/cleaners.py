@@ -15,6 +15,7 @@ hyperparameter. Some cleaners are English-specific. You'll typically want to use
 import re
 from unidecode import unidecode
 from .numbers import normalize_numbers
+import unicodedata
 
 
 # Regular expression matching whitespace:
@@ -41,6 +42,35 @@ _abbreviations = [(re.compile('\\b%s\\.' % x[0], re.IGNORECASE), x[1]) for x in 
   ('col', 'colonel'),
   ('ft', 'fort'),
 ]]
+
+# Dictionary for common Arabic abbreviation expansions
+ARABIC_ABBREVIATIONS = {
+    "د.": "دكتور",  # Dr. -> Doctor
+    "أ.د": "أستاذ دكتور",  # Prof. -> Professor Doctor
+    "م.": "مهندس",  # Eng. -> Engineer
+    "كجم": "كيلوغرام",  # kg -> kilogram
+    "كم": "كيلومتر",  # km -> kilometer
+    "دولار": "دولار أمريكي",  # Dollar -> US Dollar
+}
+
+def remove_diacritics(text):
+    """Remove Arabic diacritics (harakat)"""
+    arabic_diacritics = re.compile(r'[\u064B-\u065F]')
+    return re.sub(arabic_diacritics, '', text)
+
+def normalize_arabic_text(text):
+    '''Pipeline for Arabic text normalization'''
+    text = unicodedata.normalize("NFKC", text)  # Normalize Unicode
+    text = remove_diacritics(text)  # Remove diacritics (harakat)
+    
+    # Expand abbreviations
+    for abbr, full in ARABIC_ABBREVIATIONS.items():
+        text = text.replace(abbr, full)
+    
+    text = re.sub(r'\s+', ' ', text)  # Collapse multiple spaces
+    text = text.replace('"', '')  # Remove quotes
+    
+    return text.strip()
 
 
 def expand_abbreviations(text):
@@ -82,10 +112,4 @@ def transliteration_cleaners(text):
 
 def english_cleaners(text):
   '''Pipeline for English text, including number and abbreviation expansion.'''
-  text = convert_to_ascii(text)
-  text = lowercase(text)
-  text = expand_numbers(text)
-  text = expand_abbreviations(text)
-  text = collapse_whitespace(text)
-  text = text.replace('"', '')
-  return text
+  return normalize_arabic_text(text)
